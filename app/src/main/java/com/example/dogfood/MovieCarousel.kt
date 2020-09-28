@@ -1,40 +1,39 @@
 package com.example.dogfood
 
+import androidx.compose.animation.animatedFloat
 import androidx.compose.animation.asDisposableClock
+import androidx.compose.animation.core.AnimatedFloat
+import androidx.compose.animation.core.AnimationClockObservable
 import androidx.compose.animation.core.TargetAnimation
+import androidx.compose.animation.core.transitionDefinition
 import androidx.compose.foundation.Text
+import androidx.compose.foundation.animation.AndroidFlingDecaySpec
 import androidx.compose.foundation.animation.FlingConfig
 import androidx.compose.foundation.animation.defaultFlingConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.ScrollableController
-import androidx.compose.foundation.gestures.rememberScrollableController
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.gesture.scrollorientationlocking.Orientation
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.*
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawOpacity
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.*
 import androidx.ui.tooling.preview.Preview
 import dev.chrisbanes.accompanist.coil.CoilImage
-import java.lang.Math.abs
-import kotlin.math.max
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlin.reflect.KProperty
 
 data class Movie(
         val title: String,
@@ -74,106 +73,236 @@ val posterAspectRatio = .674f
 @Composable
 fun Screen() {
     val configuration = ConfigurationAmbient.current
-    val density = DensityAmbient.current
     val screenWidth = configuration.screenWidthDp.dp
-    val screenWidthPx = with(density) { screenWidth.toPx() }
-    val screenHeight = configuration.screenHeightDp.dp
-    val screenHeightPx = with(density) { screenHeight.toPx() }
-    var offset by remember { mutableStateOf(0f) }
     val posterWidthDp = screenWidth * 0.6f
-    val posterSpacingPx = with(density) { posterWidthDp.toPx() + 20.dp.toPx() }
-    val indexFraction = -1 * offset / posterSpacingPx
-    val flingConfig = defaultFlingConfig {
-        TargetAnimation((it / posterSpacingPx).roundToInt() * posterSpacingPx)
+    val posterSpacingDp = posterWidthDp + 20.dp
+    val carouselState = rememberCarouselState()
+    Stack {
+        Carousel(
+            items = movies,
+            state = carouselState,
+            spacing = posterSpacingDp,
+            getBackgroundImage = { it.bgUrl },
+            getForegroundImage = { it.posterUrl },
+        ) { movie, expanded ->
+            MoviePoster(
+                movie = movie,
+                modifier = Modifier
+                    .width(posterWidthDp)
+            )
+        }
+        BuyTicketButton(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .width(posterWidthDp)
+                .padding(20.dp),
+            onClick = {
+                carouselState.expandSelectedItem()
+            }
+        )
     }
-    val upperBound = 0f
-    val lowerBound = -1 * (movies.size - 1) * posterSpacingPx
-    val ctrlr = rememberScrollableController(flingConfig) {
-        val target = offset + it
+}
+
+class ValueHolder<T>(var value: T)
+
+operator fun <T> ValueHolder<T>.getValue(thisRef: Any?, property: KProperty<*>) = value
+operator fun <T> ValueHolder<T>.setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+    this.value = value
+}
+
+private fun indexToOffset(index: Int, spacingPx: Float): Float = -1 * index * spacingPx
+private fun offsetToIndex(offset: Float, spacingPx: Float): Int =
+    floor(-1 * offset / spacingPx).toInt()
+
+@Composable fun rememberCarouselState(): CarouselState {
+    val density = DensityAmbient.current
+    val clock = AnimationClockAmbient.current.asDisposableClock()
+    val animatedOffset = animatedFloat(0f)
+    val expanded = animatedFloat(0f)
+    return remember(clock, density) {
+        CarouselState(
+            density,
+            animatedOffset,
+            expanded,
+            clock,
+        )
+    }
+}
+
+class CarouselState(
+    private val density: Density,
+    internal val animatedOffset: AnimatedFloat,
+    internal val expanded: AnimatedFloat,
+    clock: AnimationClockObservable
+) {
+    private val flingConfig = FlingConfig(AndroidFlingDecaySpec(density)) { adjustTarget(it) }
+    internal val scrollableController = ScrollableController({ consumeScrollDelta(it) }, flingConfig, clock)
+    private var itemCount: Int = 0
+    internal var spacingPx: Float = 0f
+    internal fun update(count: Int, spacing: Dp) {
+        itemCount = count
+        spacingPx = with(density) { spacing.toPx() }
+    }
+    private val upperBound: Float = 0f
+    private val lowerBound: Float get() = -1 * (itemCount - 1) * spacingPx
+
+    private fun adjustTarget(target: Float): TargetAnimation? {
+        return TargetAnimation((target / spacingPx).roundToInt() * spacingPx)
+    }
+    private fun consumeScrollDelta(delta: Float): Float {
+        var target = animatedOffset.value + delta
+        var consumed = delta
         when {
             target > upperBound -> {
-                val consumed = upperBound - offset
-                offset = upperBound
-                consumed
+                consumed = upperBound - animatedOffset.value
+                target = upperBound
             }
             target < lowerBound -> {
-                val consumed = lowerBound - offset
-                offset = lowerBound
-                consumed
-            }
-            else -> {
-                offset = target
-                it
+                consumed = lowerBound - animatedOffset.value
+                target = lowerBound
             }
         }
+        animatedOffset.snapTo(target)
+        return consumed
     }
+    fun expandSelectedItem(){
+        if (expanded.value == 1f)
+            expanded.animateTo(0f)
+        else
+            expanded.animateTo(1f)
+
+    }
+    val selectedIndex: Int get() = offsetToIndex(animatedOffset.value, spacingPx)
+}
+
+
+@Composable fun <T> Carousel(
+    items: List<T>,
+    spacing: Dp,
+    state: CarouselState,
+    getBackgroundImage: (T) -> Any,
+    getForegroundImage: (T) -> Any,
+    foregroundContent: @Composable (item: T, expanded: Float) -> Unit
+) {
+    // TODO: think more about this
+    state.update(items.size, spacing)
+    val spacingPx = state.spacingPx
+    val animatedOffset = state.animatedOffset
+    val expanded = state.expanded
     Stack(
         Modifier
             .background(Color.Black)
             .fillMaxSize()
             .scrollable(
                 Orientation.Horizontal,
-                ctrlr,
+                state.scrollableController,
             )
-    )  {
-        movies.forEachIndexed { index, movie ->
-            val isInRange = (index >= indexFraction - 1 && indexFraction + 1 > index)
-            val opacity = if (isInRange) 1f else 0f
-            val shape = when {
-                !isInRange -> RectangleShape
-                // 0, 0.25 -> 0.25, 1f
-                // 1, 0.25 -> 0f, 0.25
-                index <= indexFraction -> {
-                    val fraction = indexFraction - index
-                    FractionalRectangleShape(fraction.coerceIn(0f, 1f-Float.MIN_VALUE), 1f)
-                }
-                else -> {
-                    val fraction = indexFraction - index + 1
-                    FractionalRectangleShape(0f, fraction.coerceIn(Float.MIN_VALUE, 1f))
-                }
-            }
+    ) {
+        items.forEachIndexed { index, item ->
             CoilImage(
-                    data = movie.bgUrl,
-                    modifier = Modifier
-                            .drawLayer(
-                                    alpha = opacity,
-                                    shape = shape,
-                                    clip = true
-                            )
-                            .fillMaxWidth()
-                            .aspectRatio(posterAspectRatio)
+                data = getBackgroundImage(item),
+                modifier = Modifier
+                    .carouselBackground(
+                        index = index,
+                        getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                        getExpandedFraction = { expanded.value }
+                    )
+                    .fillMaxWidth()
+                    .aspectRatio(posterAspectRatio)
+            )
+            CoilImage(
+                data = getForegroundImage(item),
+                modifier = Modifier
+                    .carouselExpandedBackground(
+                        index = index,
+                        getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                        getExpandedFraction = { expanded.value }
+                    )
+                    .offset(getX = {
+                        (index - state.selectedIndex) * 0.75f * spacingPx
+                    }, getY = { 0f })
+                    .align(Alignment.BottomCenter)
+                    .width(spacing)
+                    .aspectRatio(posterAspectRatio)
             )
         }
         Spacer(
             modifier = Modifier
-                    .gravity(Alignment.BottomEnd)
-                    .verticalGradient(0f to Color.Transparent, 0.3f to Color.White, 1f to Color.White)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f)
+                .align(Alignment.BottomEnd)
+                .verticalGradient(0f to Color.Transparent, 0.3f to Color.White, 1f to Color.White)
+                .fillMaxWidth()
+                .fillMaxHeight(0.6f)
         )
-        movies.forEachIndexed { index, movie ->
-            val center = posterSpacingPx * index
-            val distFromCenter = abs(offset + center) / posterSpacingPx
-            MoviePoster(
-                    movie = movie,
-                    modifier = Modifier
-                            .offset(getX = { center + offset }, getY = { lerp(0f, 50f, distFromCenter) })
-                            .width(posterWidthDp)
-                            .gravity(Alignment.BottomCenter)
-            )
+        items.forEachIndexed { index, item ->
+            val center = spacingPx * index
+            Column(
+                Modifier
+                    .offset(getX = {
+                        center + animatedOffset.value
+                    }, getY = {
+                        val distFromCenter = abs(animatedOffset.value + center) / spacingPx
+                        lerp(0f, 50f, distFromCenter)
+                    })
+                    .align(Alignment.BottomCenter)
+            ) {
+                foregroundContent(item, 0f)
+            }
         }
     }
 }
 
-@Composable
-fun rememberScrollableController(
-        flingConfig: FlingConfig = defaultFlingConfig(),
-        consumeScrollDelta: (Float) -> Float
-): ScrollableController {
-    val clocks = AnimationClockAmbient.current.asDisposableClock()
-    return remember(clocks, flingConfig) {
-        ScrollableController(consumeScrollDelta, flingConfig, clocks)
-    }
+fun Modifier.carouselExpandedBackground(
+    index: Int,
+    getIndexFraction: () -> Float,
+    getExpandedFraction: () -> Float,
+) = this then object : DrawLayerModifier {
+    override val alpha: Float
+        get() {
+            return getExpandedFraction()
+        }
+
+    override val translationY: Float
+        get() {
+            return lerp(0f, -400f, getExpandedFraction())
+        }
+}
+
+fun Modifier.carouselBackground(
+    index: Int,
+    getIndexFraction: () -> Float,
+    getExpandedFraction: () -> Float,
+) = this then object : DrawLayerModifier {
+    override val alpha: Float
+        get() {
+            val indexFraction = getIndexFraction()
+            val leftIndex = floor(indexFraction).toInt()
+            val rightIndex = ceil(indexFraction).toInt()
+            return if (index == leftIndex || index == rightIndex)
+                1f - getExpandedFraction()
+            else
+                0f
+        }
+    override val shape: Shape
+        get() {
+            val indexFraction = getIndexFraction()
+            val leftIndex = floor(indexFraction).toInt()
+            val rightIndex = ceil(indexFraction).toInt()
+            return when (index) {
+                rightIndex -> {
+                    // 1, 0.25 -> 0f, 0.25
+                    val fraction = indexFraction - index + 1
+                    FractionalRectangleShape(0f, fraction)
+                }
+                leftIndex -> {
+                    // 0, 0.25 -> 0.25, 1f
+                    val fraction = indexFraction - index
+                    FractionalRectangleShape(fraction, 1f)
+                }
+                else -> RectangleShape
+            }
+        }
+    override val clip: Boolean
+        get() = true
 }
 
 fun FractionalRectangleShape(startFraction: Float, endFraction: Float) = object : Shape {
@@ -181,9 +310,9 @@ fun FractionalRectangleShape(startFraction: Float, endFraction: Float) = object 
             Outline.Rectangle(
                     Rect(
                             top = 0f,
-                            left = startFraction * size.width,
+                            left = (startFraction * size.width).coerceAtMost(size.width - 1f),
                             bottom = size.height,
-                            right = endFraction * size.width
+                            right = (endFraction * size.width).coerceAtLeast(1f)
                     )
             )
 }
@@ -253,6 +382,7 @@ fun Modifier.offset(
         .clip(RoundedCornerShape(20.dp))
         .background(Color.White)
         .padding(20.dp)
+        .padding(bottom = 60.dp)
     ) {
         CoilImage(
             movie.posterUrl,
@@ -275,13 +405,13 @@ fun Modifier.offset(
     }
 }
 
-@Composable fun BuyTicketButton(onClick: () -> Unit) {
+@Composable fun BuyTicketButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         backgroundColor = Color.DarkGray,
         elevation = 0.dp,
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .padding(vertical = 10.dp)
     ) {
         Text("Buy Ticket", color = Color.White)
     }
