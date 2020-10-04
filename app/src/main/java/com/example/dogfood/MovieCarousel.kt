@@ -1,15 +1,12 @@
 package com.example.dogfood
 
-import androidx.compose.animation.animatedFloat
-import androidx.compose.animation.asDisposableClock
-import androidx.compose.animation.core.AnimatedFloat
-import androidx.compose.animation.core.AnimationClockObservable
-import androidx.compose.animation.core.TargetAnimation
-import androidx.compose.animation.core.transitionDefinition
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Text
 import androidx.compose.foundation.animation.AndroidFlingDecaySpec
 import androidx.compose.foundation.animation.FlingConfig
 import androidx.compose.foundation.animation.defaultFlingConfig
+import androidx.compose.foundation.animation.fling
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.ScrollableController
@@ -18,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.snapshotFlow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.gesture.scrollorientationlocking.Orientation
 import androidx.compose.ui.layout.ContentScale
@@ -29,12 +27,18 @@ import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.*
 import androidx.ui.tooling.preview.Preview
 import dev.chrisbanes.accompanist.coil.CoilImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlin.coroutines.CoroutineContext
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.reflect.KProperty
 
+@Immutable
 data class Movie(
         val title: String,
         val posterUrl: String,
@@ -87,8 +91,9 @@ fun Screen() {
         ) { movie, expanded ->
             MoviePoster(
                 movie = movie,
-                modifier = Modifier
-                    .width(posterWidthDp)
+                expanded = expanded,
+                expandedWidth = screenWidth,
+                normalWidth = posterWidthDp,
             )
         }
         BuyTicketButton(
@@ -137,6 +142,8 @@ class CarouselState(
 ) {
     private val flingConfig = FlingConfig(AndroidFlingDecaySpec(density)) { adjustTarget(it) }
     internal val scrollableController = ScrollableController({ consumeScrollDelta(it) }, flingConfig, clock)
+    var expandedIndex by mutableStateOf<Int?>(null)
+        private set
     private var itemCount: Int = 0
     internal var spacingPx: Float = 0f
     internal fun update(count: Int, spacing: Dp) {
@@ -165,12 +172,14 @@ class CarouselState(
         animatedOffset.snapTo(target)
         return consumed
     }
-    fun expandSelectedItem(){
-        if (expanded.value == 1f)
+    fun expandSelectedItem() {
+        if (expandedIndex != null) {
+            expandedIndex = null
             expanded.animateTo(0f)
-        else
+        } else {
+            expandedIndex = selectedIndex
             expanded.animateTo(1f)
-
+        }
     }
     val selectedIndex: Int get() = offsetToIndex(animatedOffset.value, spacingPx)
 }
@@ -182,7 +191,7 @@ class CarouselState(
     state: CarouselState,
     getBackgroundImage: (T) -> Any,
     getForegroundImage: (T) -> Any,
-    foregroundContent: @Composable (item: T, expanded: Float) -> Unit
+    foregroundContent: @Composable (item: T, expanded: Boolean) -> Unit
 ) {
     // TODO: think more about this
     state.update(items.size, spacing)
@@ -210,20 +219,40 @@ class CarouselState(
                     .fillMaxWidth()
                     .aspectRatio(posterAspectRatio)
             )
+            if (index != state.expandedIndex) {
+                CoilImage(
+                        data = getForegroundImage(item),
+                        modifier = Modifier
+                                .carouselExpandedBackground(
+                                        index = index,
+                                        getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                                        getExpandedFraction = { expanded.value }
+                                )
+                                .offset(getX = {
+                                    (index - state.selectedIndex) * 0.75f * spacingPx
+                                }, getY = { 0f })
+                                .align(Alignment.BottomCenter)
+                                .width(spacing)
+                                .aspectRatio(posterAspectRatio)
+                )
+            }
+        }
+        state.expandedIndex?.let {
             CoilImage(
-                data = getForegroundImage(item),
-                modifier = Modifier
-                    .carouselExpandedBackground(
-                        index = index,
-                        getIndexFraction = { -1 * animatedOffset.value / spacingPx },
-                        getExpandedFraction = { expanded.value }
-                    )
-                    .offset(getX = {
-                        (index - state.selectedIndex) * 0.75f * spacingPx
-                    }, getY = { 0f })
-                    .align(Alignment.BottomCenter)
-                    .width(spacing)
-                    .aspectRatio(posterAspectRatio)
+                    data = getForegroundImage(items[it]),
+                    modifier = Modifier
+                            .carouselExpandedBackground(
+                                    index = it,
+                                    getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                                    getExpandedFraction = { expanded.value }
+                            )
+                            .offset(
+                                    getX = { 0f },
+                                    getY = { 0f }
+                            )
+                            .align(Alignment.BottomCenter)
+                            .width(spacing)
+                            .aspectRatio(posterAspectRatio)
             )
         }
         Spacer(
@@ -237,19 +266,22 @@ class CarouselState(
             val center = spacingPx * index
             Column(
                 Modifier
+                    .zIndex(if (state.expandedIndex == index) 1f else 0f)
                     .offset(getX = {
                         center + animatedOffset.value
                     }, getY = {
                         val distFromCenter = abs(animatedOffset.value + center) / spacingPx
                         lerp(0f, 50f, distFromCenter)
                     })
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.TopCenter)
             ) {
-                foregroundContent(item, 0f)
+                foregroundContent(item, state.expandedIndex == index)
             }
         }
     }
 }
+
+@Composable fun Scope(content: @Composable () -> Unit) = content()
 
 fun Modifier.carouselExpandedBackground(
     index: Int,
@@ -377,18 +409,61 @@ fun Modifier.offset(
     }
 }
 
-@Composable fun MoviePoster(movie: Movie, modifier: Modifier = Modifier) {
+@OptIn(ExperimentalComposeApi::class)
+fun AnimatedFloat.tracks(other: AnimatedFloat, scope: CoroutineScope) {
+    snapshotFlow { other.value }
+        .onEach {
+            animateTo(it)
+        }.launchIn(scope)
+}
+
+
+val imageWidthKey = FloatPropKey()
+val imageScaleKey = FloatPropKey()
+val posterTransition = transitionDefinition<Boolean> {
+
+}
+
+@Composable fun MoviePoster(
+        movie: Movie,
+        expanded: Boolean,
+        expandedWidth: Dp,
+        normalWidth: Dp,
+        modifier: Modifier = Modifier
+) {
+    val posterPadding = 20.dp
+    val fullImageWidth = normalWidth - 2 * posterPadding
+    val t = animatedFloat(if (expanded) 1f else 0f)
+    onCommit(expanded) {
+        t.animateTo(if (expanded) 1f else 0f)
+    }
+    val t2 = animatedFloat(0f)
+    val scope = rememberCoroutineScope()
+    onActive {
+        t2.tracks(t, scope)
+    }
+    val imageScale = lerp(1f, 0f, t.value)
+    val imageAlpha = lerp(1f, 0f, t.value)
+    val imageWidth = lerp(fullImageWidth.value, 0f, t2.value)
     Column(modifier
+        .width(if (expanded) expandedWidth else normalWidth)
+        .padding(top = 200.dp)
         .clip(RoundedCornerShape(20.dp))
         .background(Color.White)
-        .padding(20.dp)
-        .padding(bottom = 60.dp)
+        .padding(posterPadding)
+        .padding(bottom = 60.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CoilImage(
             movie.posterUrl,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .fillMaxWidth()
+                .drawLayer(
+                    scaleX = imageScale,
+                    scaleY = imageScale,
+                    alpha = imageAlpha,
+                )
+                .width(imageWidth.dp)
                 .aspectRatio(posterAspectRatio)
                 .clip(RoundedCornerShape(10.dp))
         )
