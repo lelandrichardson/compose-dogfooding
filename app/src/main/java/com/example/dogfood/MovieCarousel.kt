@@ -2,18 +2,18 @@ package com.example.dogfood
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Text
+import androidx.compose.foundation.*
 import androidx.compose.foundation.animation.AndroidFlingDecaySpec
 import androidx.compose.foundation.animation.FlingConfig
 import androidx.compose.foundation.animation.defaultFlingConfig
 import androidx.compose.foundation.animation.fling
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.ScrollableController
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.snapshotFlow
 import androidx.compose.ui.draw.clip
@@ -44,7 +44,14 @@ data class Movie(
         val posterUrl: String,
         val bgUrl: String,
         val color: Color,
-        val chips: List<String>
+        val chips: List<String>,
+        val actors: List<MovieActor> = emptyList(),
+        val introduction: String = ""
+)
+
+data class MovieActor(
+    val name: String,
+    val image: String
 )
 
 val movies = listOf(
@@ -53,21 +60,39 @@ val movies = listOf(
         posterUrl = "https://m.media-amazon.com/images/M/MV5BMTc1NjIzODAxMF5BMl5BanBnXkFtZTgwMTgzNzk1NzM@._V1_.jpg",
         bgUrl = "https://m.media-amazon.com/images/M/MV5BMTc1NjIzODAxMF5BMl5BanBnXkFtZTgwMTgzNzk1NzM@._V1_.jpg",
         color = Color.Red,
-        chips = listOf("Action", "Drama", "History")
+        chips = listOf("Action", "Drama", "History"),
+        actors = listOf(
+            MovieActor("Jaoquin Phoenix", "https://image.tmdb.org/t/p/w138_and_h175_face/nXMzvVF6xR3OXOedozfOcoA20xh.jpg"),
+            MovieActor("Robert De Niro", "https://image.tmdb.org/t/p/w138_and_h175_face/cT8htcckIuyI1Lqwt1CvD02ynTh.jpg"),
+            MovieActor("Zazie Beetz", "https://image.tmdb.org/t/p/w138_and_h175_face/sgxzT54GnvgeMnOZgpQQx9csAdd.jpg")
+        ),
+        introduction = "During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure."
     ),
     Movie(
         title = "Joker",
         posterUrl = "https://i.etsystatic.com/15963200/r/il/25182b/2045311689/il_794xN.2045311689_7m2o.jpg",
         bgUrl = "https://images-na.ssl-images-amazon.com/images/I/61gtGlalRvL._AC_SY741_.jpg",
         color = Color.Blue,
-        chips = listOf("Action", "Drama", "History")
+        chips = listOf("Action", "Drama", "History"),
+        actors = listOf(
+            MovieActor("Jaoquin Phoenix", "https://image.tmdb.org/t/p/w138_and_h175_face/nXMzvVF6xR3OXOedozfOcoA20xh.jpg"),
+            MovieActor("Robert De Niro", "https://image.tmdb.org/t/p/w138_and_h175_face/cT8htcckIuyI1Lqwt1CvD02ynTh.jpg"),
+            MovieActor("Zazie Beetz", "https://image.tmdb.org/t/p/w138_and_h175_face/sgxzT54GnvgeMnOZgpQQx9csAdd.jpg")
+        ),
+        introduction = "During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure."
     ),
     Movie(
         title = "The Hustle",
         posterUrl = "https://m.media-amazon.com/images/M/MV5BMTc3MDcyNzE5N15BMl5BanBnXkFtZTgwNzE2MDE0NzM@._V1_.jpg",
         bgUrl = "https://m.media-amazon.com/images/M/MV5BMTc3MDcyNzE5N15BMl5BanBnXkFtZTgwNzE2MDE0NzM@._V1_.jpg",
         color = Color.Yellow,
-        chips = listOf("Action", "Drama", "History")
+        chips = listOf("Action", "Drama", "History"),
+        actors = listOf(
+            MovieActor("Jaoquin Phoenix", "https://image.tmdb.org/t/p/w138_and_h175_face/nXMzvVF6xR3OXOedozfOcoA20xh.jpg"),
+            MovieActor("Robert De Niro", "https://image.tmdb.org/t/p/w138_and_h175_face/cT8htcckIuyI1Lqwt1CvD02ynTh.jpg"),
+            MovieActor("Zazie Beetz", "https://image.tmdb.org/t/p/w138_and_h175_face/sgxzT54GnvgeMnOZgpQQx9csAdd.jpg")
+        ),
+        introduction = "During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure."
     )
 )
 
@@ -157,6 +182,9 @@ class CarouselState(
         return TargetAnimation((target / spacingPx).roundToInt() * spacingPx)
     }
     private fun consumeScrollDelta(delta: Float): Float {
+        if (expandedIndex != null) {
+            return 0f
+        }
         var target = animatedOffset.value + delta
         var consumed = delta
         when {
@@ -175,10 +203,13 @@ class CarouselState(
     fun expandSelectedItem() {
         if (expandedIndex != null) {
             expandedIndex = null
-            expanded.animateTo(0f)
+            expanded.animateTo(0f, SpringSpec(stiffness = Spring.StiffnessLow))
         } else {
             expandedIndex = selectedIndex
-            expanded.animateTo(1f)
+            expanded.animateTo(1f, SpringSpec(
+                stiffness = Spring.StiffnessLow,
+                dampingRatio = Spring.DampingRatioLowBouncy
+            ))
         }
     }
     val selectedIndex: Int get() = offsetToIndex(animatedOffset.value, spacingPx)
@@ -198,6 +229,7 @@ class CarouselState(
     val spacingPx = state.spacingPx
     val animatedOffset = state.animatedOffset
     val expanded = state.expanded
+    val expandedIndex = state.expandedIndex
     Stack(
         Modifier
             .background(Color.Black)
@@ -219,36 +251,29 @@ class CarouselState(
                     .fillMaxWidth()
                     .aspectRatio(posterAspectRatio)
             )
-            if (index != state.expandedIndex) {
+            if (expandedIndex != null && abs(index - expandedIndex) == 1) {
                 CoilImage(
                         data = getForegroundImage(item),
                         modifier = Modifier
                                 .carouselExpandedBackground(
                                         index = index,
-                                        getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                                        expandedIndex = expandedIndex,
                                         getExpandedFraction = { expanded.value }
                                 )
-                                .offset(getX = {
-                                    (index - state.selectedIndex) * 0.75f * spacingPx
-                                }, getY = { 0f })
                                 .align(Alignment.BottomCenter)
                                 .width(spacing)
                                 .aspectRatio(posterAspectRatio)
                 )
             }
         }
-        state.expandedIndex?.let {
+        if (expandedIndex != null) {
             CoilImage(
-                    data = getForegroundImage(items[it]),
+                    data = getForegroundImage(items[expandedIndex]),
                     modifier = Modifier
                             .carouselExpandedBackground(
-                                    index = it,
-                                    getIndexFraction = { -1 * animatedOffset.value / spacingPx },
+                                    index = expandedIndex,
+                                    expandedIndex = expandedIndex,
                                     getExpandedFraction = { expanded.value }
-                            )
-                            .offset(
-                                    getX = { 0f },
-                                    getY = { 0f }
                             )
                             .align(Alignment.BottomCenter)
                             .width(spacing)
@@ -266,7 +291,7 @@ class CarouselState(
             val center = spacingPx * index
             Column(
                 Modifier
-                    .zIndex(if (state.expandedIndex == index) 1f else 0f)
+                    .zIndex(if (expandedIndex == index) 1f else 0f)
                     .offset(getX = {
                         center + animatedOffset.value
                     }, getY = {
@@ -275,7 +300,7 @@ class CarouselState(
                     })
                     .align(Alignment.TopCenter)
             ) {
-                foregroundContent(item, state.expandedIndex == index)
+                foregroundContent(item, expandedIndex == index)
             }
         }
     }
@@ -285,7 +310,7 @@ class CarouselState(
 
 fun Modifier.carouselExpandedBackground(
     index: Int,
-    getIndexFraction: () -> Float,
+    expandedIndex: Int,
     getExpandedFraction: () -> Float,
 ) = this then object : DrawLayerModifier {
     override val alpha: Float
@@ -295,7 +320,13 @@ fun Modifier.carouselExpandedBackground(
 
     override val translationY: Float
         get() {
-            return lerp(0f, -400f, getExpandedFraction())
+            val indexOffset = abs(index - expandedIndex)
+            return lerp(0f, -600f + 200 * indexOffset, getExpandedFraction())
+        }
+
+    override val translationX: Float
+        get() {
+            return (index - expandedIndex) * 170f
         }
 }
 
@@ -409,19 +440,54 @@ fun Modifier.offset(
     }
 }
 
+
 @OptIn(ExperimentalComposeApi::class)
-fun AnimatedFloat.tracks(other: AnimatedFloat, scope: CoroutineScope) {
-    snapshotFlow { other.value }
-        .onEach {
-            animateTo(it)
-        }.launchIn(scope)
+fun <T, V: AnimationVector> BaseAnimatedValue<T, V>.animateTo(target: () -> T, scope: CoroutineScope) {
+    snapshotFlow(target)
+        .onEach { animateTo(it) }
+        .launchIn(scope)
 }
 
 
-val imageWidthKey = FloatPropKey()
+val imageWidthKey = DpPropKey()
+val widthKey = DpPropKey()
 val imageScaleKey = FloatPropKey()
-val posterTransition = transitionDefinition<Boolean> {
-
+val imageAlphaKey = FloatPropKey()
+val bodyTranslateKey = FloatPropKey()
+val bodyAlphaKey = FloatPropKey()
+val posterPadding = 20.dp
+fun makePosterTransition(expandedWidth: Dp, normalWidth: Dp) = transitionDefinition<Boolean> {
+    state(true) { // expanded
+        this[widthKey] = expandedWidth
+        this[imageWidthKey] = 1.dp
+        this[imageScaleKey] = 0f
+        this[imageAlphaKey] = 0f
+        this[bodyTranslateKey] = 0f
+        this[bodyAlphaKey] = 1f
+    }
+    state(false) { // unexpanded
+        this[widthKey] = normalWidth
+        this[imageWidthKey] = normalWidth - 2 * posterPadding
+        this[imageScaleKey] = 1f
+        this[imageAlphaKey] = 1f
+        this[bodyTranslateKey] = 100f
+        this[bodyAlphaKey] = 0f
+    }
+    transition(false to true) {
+        bodyTranslateKey using keyframes {
+            100f at 200
+            0f at 500 with FastOutLinearInEasing
+        }
+        bodyAlphaKey using keyframes {
+//            delayMillis = 200
+            0f at 200
+            1f at 500
+        }
+//        imageWidthKey using spring(
+//            dampingRatio = Spring.DampingRatioHighBouncy,
+//            stiffness = Spring.StiffnessVeryLow
+//        )
+    }
 }
 
 @Composable fun MoviePoster(
@@ -431,39 +497,28 @@ val posterTransition = transitionDefinition<Boolean> {
         normalWidth: Dp,
         modifier: Modifier = Modifier
 ) {
-    val posterPadding = 20.dp
-    val fullImageWidth = normalWidth - 2 * posterPadding
-    val t = animatedFloat(if (expanded) 1f else 0f)
-    onCommit(expanded) {
-        t.animateTo(if (expanded) 1f else 0f)
-    }
-    val t2 = animatedFloat(0f)
-    val scope = rememberCoroutineScope()
-    onActive {
-        t2.tracks(t, scope)
-    }
-    val imageScale = lerp(1f, 0f, t.value)
-    val imageAlpha = lerp(1f, 0f, t.value)
-    val imageWidth = lerp(fullImageWidth.value, 0f, t2.value)
-    Column(modifier
-        .width(if (expanded) expandedWidth else normalWidth)
-        .padding(top = 200.dp)
-        .clip(RoundedCornerShape(20.dp))
-        .background(Color.White)
-        .padding(posterPadding)
-        .padding(bottom = 60.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+    val tDef = remember(expandedWidth, normalWidth) { makePosterTransition(expandedWidth, normalWidth) }
+    val t = transition(tDef, expanded)
+    ScrollableColumn(
+        modifier = modifier
+            .width(t[widthKey])
+            .padding(top = 200.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White),
+        contentPadding = PaddingValues(posterPadding),
+        isScrollEnabled = expanded,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CoilImage(
             movie.posterUrl,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .drawLayer(
-                    scaleX = imageScale,
-                    scaleY = imageScale,
-                    alpha = imageAlpha,
+                    scaleX = t[imageScaleKey],
+                    scaleY = t[imageScaleKey],
+                    alpha = t[imageAlphaKey],
                 )
-                .width(imageWidth.dp)
+                .width(t[imageWidthKey])
                 .aspectRatio(posterAspectRatio)
                 .clip(RoundedCornerShape(10.dp))
         )
@@ -477,6 +532,47 @@ val posterTransition = transitionDefinition<Boolean> {
             }
         }
         StarRating(9.0f)
+        if (expanded) {
+            Column(
+                modifier = Modifier.drawLayer(
+                    alpha = t[bodyAlphaKey],
+                    translationY = t[bodyTranslateKey],
+                )
+            ) {
+                Text(
+                    "Actors",
+                    style = MaterialTheme.typography.body1,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                ScrollableRow {
+                    movie.actors.forEach {
+                        Actor(it)
+                    }
+                }
+                Text(
+                    "Introduction",
+                    style = MaterialTheme.typography.body1,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
+                )
+                Text(movie.introduction, style = MaterialTheme.typography.body2)
+                Text(movie.introduction, style = MaterialTheme.typography.body2)
+                Text(movie.introduction, style = MaterialTheme.typography.body2)
+                Text(movie.introduction, style = MaterialTheme.typography.body2)
+            }
+        }
+    }
+}
+
+@Composable fun Actor(actor: MovieActor) {
+    Column {
+        CoilImage(
+            data = actor.image,
+            modifier = Modifier
+                .padding(end = 20.dp)
+                .size(138.dp, 175.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
+        Text(actor.name)
     }
 }
 
