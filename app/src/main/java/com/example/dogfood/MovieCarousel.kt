@@ -5,8 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.animation.AndroidFlingDecaySpec
 import androidx.compose.foundation.animation.FlingConfig
-import androidx.compose.foundation.animation.defaultFlingConfig
-import androidx.compose.foundation.animation.fling
 import androidx.compose.foundation.gestures.ScrollableController
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
@@ -25,28 +23,27 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.*
-import androidx.ui.tooling.preview.Preview
+import com.example.dogfood.api.*
 import dev.chrisbanes.accompanist.coil.CoilImage
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.reflect.KProperty
-
+/*
 @Immutable
 data class Movie(
-        val title: String,
-        val posterUrl: String,
+    val title: String,
+    val posterUrl: String, Grad
         val bgUrl: String,
-        val color: Color,
-        val chips: List<String>,
-        val actors: List<MovieActor> = emptyList(),
-        val introduction: String = ""
+    val color: Color,
+    val chips: List<String>,
+    val actors: List<MovieActor> = emptyList(),
+    val introduction: String = ""
 )
 
 data class MovieActor(
@@ -95,10 +92,9 @@ val movies = listOf(
         introduction = "During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure."
     )
 )
-
+*/
 val posterAspectRatio = .674f
 
-@Preview
 @Composable
 fun Screen() {
     val configuration = ConfigurationAmbient.current
@@ -106,13 +102,24 @@ fun Screen() {
     val posterWidthDp = screenWidth * 0.6f
     val posterSpacingDp = posterWidthDp + 20.dp
     val carouselState = rememberCarouselState()
+
+    val api = AmbientMovieApi.current
+    var movies by remember { mutableStateOf<MoviesResponse?>(null) }
+    launchInComposition {
+        movies = api.topRated(1)
+    }
+
     Stack {
         Carousel(
-            items = movies,
+            items = movies?.results ?: emptyList<PartialMovie>(),
             state = carouselState,
             spacing = posterSpacingDp,
-            getBackgroundImage = { it.bgUrl },
-            getForegroundImage = { it.posterUrl },
+            getBackgroundImage = {
+                it.posterUrl
+            },
+            getForegroundImage = {
+                it.posterUrl
+            },
         ) { movie, expanded ->
             MoviePoster(
                 movie = movie,
@@ -491,14 +498,15 @@ fun makePosterTransition(expandedWidth: Dp, normalWidth: Dp) = transitionDefinit
 }
 
 @Composable fun MoviePoster(
-        movie: Movie,
-        expanded: Boolean,
-        expandedWidth: Dp,
-        normalWidth: Dp,
-        modifier: Modifier = Modifier
+    movie: PartialMovie,
+    expanded: Boolean,
+    expandedWidth: Dp,
+    normalWidth: Dp,
+    modifier: Modifier = Modifier
 ) {
     val tDef = remember(expandedWidth, normalWidth) { makePosterTransition(expandedWidth, normalWidth) }
-    val t = transition(tDef, expanded)
+    var fullMovie by remember { mutableStateOf<Movie?>(null) }
+    val t = transition(tDef, expanded && fullMovie != null)
     ScrollableColumn(
         modifier = modifier
             .width(t[widthKey])
@@ -527,12 +535,19 @@ fun makePosterTransition(expandedWidth: Dp, normalWidth: Dp) = transitionDefinit
             color = Color.Black
         )
         Row {
-            for (chip in movie.chips) {
+            for (chip in listOf("Action", "Drama", "History")) {
                 Chip(chip)
             }
         }
         StarRating(9.0f)
         if (expanded) {
+            val api = AmbientMovieApi.current
+            launchInComposition {
+                fullMovie = api.movie(movie.id)
+            }
+        }
+        val fullMovie = fullMovie
+        if (expanded && fullMovie != null) {
             Column(
                 modifier = Modifier.drawLayer(
                     alpha = t[bodyAlphaKey],
@@ -545,28 +560,27 @@ fun makePosterTransition(expandedWidth: Dp, normalWidth: Dp) = transitionDefinit
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 ScrollableRow {
-                    movie.actors.forEach {
+                    fullMovie.credits.cast.filter { it.profile_path != null }.take(10).forEach {
                         Actor(it)
                     }
                 }
-                Text(
-                    "Introduction",
-                    style = MaterialTheme.typography.body1,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
-                )
-                Text(movie.introduction, style = MaterialTheme.typography.body2)
-                Text(movie.introduction, style = MaterialTheme.typography.body2)
-                Text(movie.introduction, style = MaterialTheme.typography.body2)
-                Text(movie.introduction, style = MaterialTheme.typography.body2)
+                if (fullMovie.overview != null) {
+                    Text(
+                        "Overview",
+                        style = MaterialTheme.typography.body1,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
+                    )
+                    Text(fullMovie.overview, style = MaterialTheme.typography.body2)
+                }
             }
         }
     }
 }
 
-@Composable fun Actor(actor: MovieActor) {
+@Composable fun Actor(actor: CastMember) {
     Column {
         CoilImage(
-            data = actor.image,
+            data = actor.profileUrl,
             modifier = Modifier
                 .padding(end = 20.dp)
                 .size(138.dp, 175.dp)
