@@ -1,5 +1,6 @@
 package com.example.pmapp
 
+import android.graphics.DashPathEffect
 import androidx.compose.foundation.Icon
 import androidx.compose.foundation.Text
 import androidx.compose.foundation.background
@@ -10,27 +11,66 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Layout
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.drawBehind
+import androidx.compose.ui.*
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 
 val linePosition = 80.dp
+val timelineDotSize = 8.dp
+val dashPathEffect = DashPathEffect(floatArrayOf(20f, 10f), 0f)
 
-val DrawScope.topRight: Offset get() = size.topRight(Offset.Zero)
-val DrawScope.bottomRight: Offset get() = size.bottomRight(Offset.Zero)
+val DrawScope.topRight: Offset get() = Offset(size.width, 0f)
+val DrawScope.bottomRight: Offset get() = Offset(size.width, size.height)
 
-fun Modifier.drawLine() = drawBehind {
-    drawLine(Color.Black, topRight, bottomRight, 4f)
+enum class LineState(val color: Color, val stroke: Stroke) {
+    Undefined(Color.Gray, Stroke(width = 1f, pathEffect = dashPathEffect)), // dotted line
+    In(Color.White, Stroke(width = 8f)), // solid white
+    Out(Color.Gray, Stroke(width = 1f)) // solid gray
+}
+
+fun Modifier.drawLine(
+        status: Status?,
+        top: LineState,
+        bottom: LineState
+) = drawBehind {
+    val centerPosition = Offset(x=size.width, y=size.height / 2f)
+    drawLine(
+        color = top.color,
+        start = topRight,
+        end = centerPosition,
+        strokeWidth = top.stroke.width,
+        pathEffect = top.stroke.pathEffect
+    )
+    drawLine(
+        color = bottom.color,
+        start = centerPosition,
+        end = bottomRight,
+        strokeWidth = bottom.stroke.width,
+        pathEffect = bottom.stroke.pathEffect
+    )
+    if (status != null) {
+        drawCircle(
+            color = Color.White,
+            radius = timelineDotSize.toPx(),
+            center = centerPosition
+        )
+        drawCircle(
+            color = status.color,
+            radius = (timelineDotSize - 2.dp).toPx(),
+            center = centerPosition
+        )
+    }
 }
 
 @Composable fun TimelineRow(
+    status: Status?,
+    topLineState: LineState,
+    bottomLineState: LineState,
     leftContent: @Composable () -> Unit,
     rightContent: @Composable () -> Unit
 ) {
@@ -38,7 +78,7 @@ fun Modifier.drawLine() = drawBehind {
         Row(
             Modifier
                 .padding(end=16.dp)
-                .drawLine(),
+                .drawLine(status, topLineState, bottomLineState),
             verticalAlignment = Alignment.CenterVertically
         ) {
             leftContent()
@@ -70,12 +110,13 @@ fun Modifier.drawLine() = drawBehind {
 @Composable
 fun TimelineHeader() {
     TimelineRow(
+        status = null,
+        topLineState = LineState.Undefined,
+        bottomLineState = LineState.Undefined,
         leftContent = {
             Text("Data")
         }
     ) {
-        val x = 4 * 2.dp
-        val y = 2.dp * 4
         Text("Tasks")
         Text("Show in days")
     }
@@ -83,8 +124,15 @@ fun TimelineHeader() {
 
 
 @Composable
-fun TimelineTask(task: Task) {
+fun TimelineTask(
+    task: Task,
+    topLineState: LineState,
+    bottomLineState: LineState,
+) {
     TimelineRow(
+        status = task.status,
+        topLineState = topLineState,
+        bottomLineState = bottomLineState,
         leftContent = {
             Text(task.timeCode)
         }

@@ -2,7 +2,6 @@ package com.example.pmapp
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.RowScope.align
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -208,8 +207,23 @@ fun TimelineScreen(project: Project = mockProject) {
                 .fillMaxWidth()
         ) {
             TimelineHeader()
-            for (task in project.tasks) {
-                TimelineTask(task)
+            for (index in project.tasks.indices) {
+                val task = project.tasks[index]
+                val prev = project.tasks.getOrNull(index - 1)
+                val next = project.tasks.getOrNull(index + 1)
+                TimelineTask(
+                    task = task,
+                    topLineState = when {
+                        prev == null -> LineState.Undefined
+                        task.timeCode == prev.timeCode -> LineState.In
+                        else -> LineState.Out
+                    },
+                    bottomLineState = when {
+                        next == null -> LineState.Undefined
+                        task.timeCode == next.timeCode -> LineState.In
+                        else -> LineState.Out
+                    },
+                )
             }
         }
     }
