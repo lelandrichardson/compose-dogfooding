@@ -1,19 +1,18 @@
 package com.example.pmapp
 
-import androidx.compose.foundation.ScrollableColumn
-import androidx.compose.foundation.Text
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
+import androidx.compose.material.TextFieldDefaults.textFieldColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.*
-import androidx.compose.runtime.State
-import androidx.compose.runtime.snapshots.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -23,9 +22,6 @@ import androidx.compose.ui.unit.sp
 import com.example.pmapp.ui.bgColor
 import com.example.pmapp.ui.primaryGreen
 import dev.chrisbanes.accompanist.coil.CoilImage
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
-import kotlin.math.sqrt
 
 
 class Client(
@@ -76,7 +72,7 @@ fun CreateTaskScreen(clients: List<Client> = mockClients) {
   var category by remember { mutableStateOf("Design") }
   val attachments = remember { mutableStateListOf(mockAttachment) }
 
-  ScrollableColumn {
+  Column(Modifier.verticalScroll(rememberScrollState())) {
     Surface(
       color = bgColor,
       contentColor = Color.White,
@@ -125,13 +121,13 @@ fun CreateTaskScreen(clients: List<Client> = mockClients) {
         }
 
         Surface(
-          shape = RoundedCornerShape(topLeft = 24.dp, topRight = 24.dp),
+          shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
           color = Color.White
         ) {
           Column(Modifier.padding(horizontal = 16.dp, vertical = 24.dp)) {
             Text("Description")
             IconButton(onClick = {}) {
-              Icon(Icons.Default.Attachment, tint = primaryGreen)
+              Icon(Icons.Default.Attachment, contentDescription = "Description", tint = primaryGreen)
             }
             Text("ATTACHMENTS")
             for (attachment in attachments) {
@@ -158,6 +154,7 @@ fun CreateTaskScreen(clients: List<Client> = mockClients) {
         .clip(CircleShape)
         .background(Color.White),
       data = attachment.preview,
+      contentDescription = null,
     )
     Spacer(Modifier.size(8.dp))
     Column(Modifier.weight(1f)) {
@@ -172,7 +169,7 @@ fun CreateTaskScreen(clients: List<Client> = mockClients) {
       )
     }
     IconButton(onClick = {}) {
-      Icon(Icons.Default.Stop)
+      Icon(Icons.Default.Stop, contentDescription = null)
     }
   }
 }
@@ -195,8 +192,8 @@ inline fun Field(label: String, content: @Composable RowScope.() -> Unit) {
     values: List<String>,
     onSelectedChange: (String) -> Unit
 ) {
-  val selectedColor = ButtonConstants.defaultButtonColors(backgroundColor = primaryGreen, contentColor = Color.White)
-  val unselectedColor = ButtonConstants.defaultButtonColors(backgroundColor = Color.White)
+  val selectedColor = ButtonDefaults.buttonColors(backgroundColor = primaryGreen, contentColor = Color.White)
+  val unselectedColor = ButtonDefaults.buttonColors(backgroundColor = Color.White)
   Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
     for(value in values) {
       val selected = value == selectedValue
@@ -208,7 +205,8 @@ inline fun Field(label: String, content: @Composable RowScope.() -> Unit) {
       ) {
         if (selected)
           Icon(
-            asset = Icons.Default.Check,
+            Icons.Default.Check,
+            contentDescription = null,
             modifier = Modifier.size(16.dp)
           )
         else
@@ -236,7 +234,8 @@ fun ClientDropdownField(
         .size(48.dp)
         .clip(CircleShape)
         .background(Color.White),
-      data = "https://i.pravatar.cc/200?img=2"
+      data = "https://i.pravatar.cc/200?img=2",
+      contentDescription = null,
     )
     Spacer(Modifier.size(6.dp))
     PMTextField(value = selectedValue.name, onValueChange = {})
@@ -271,8 +270,10 @@ fun PMTextField(
     value = value,
     onValueChange = onValueChange,
     textStyle = TextStyle(color = Color.White),
-    activeColor = Color.White,
-    inactiveColor = Color.White.copy(alpha=0.7f),
-    backgroundColor = bgColor
+    colors = textFieldColors(
+      textColor= Color.White,
+//       = Color.White.copy(alpha=0.7f),
+//      backgroundColor = bgColor
+    )
   )
 }

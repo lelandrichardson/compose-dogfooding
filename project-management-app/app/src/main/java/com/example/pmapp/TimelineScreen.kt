@@ -1,29 +1,31 @@
+@file:SuppressLint("ModifierParameter")
 package com.example.pmapp
 
-import androidx.compose.foundation.*
+import android.annotation.SuppressLint
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.FloatingActionButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.materialIcon
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawShadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.DensityAmbient
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -172,7 +174,7 @@ val mockProject = Project(
 
 @Composable
 fun TimelineScreen(project: Project = mockProject) {
-    ScrollableColumn {
+    Column(Modifier.verticalScroll(rememberScrollState())) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Text(project.title, style = typography.h1)
             Row {
@@ -180,7 +182,10 @@ fun TimelineScreen(project: Project = mockProject) {
                 Text("|", modifier = Modifier.padding(horizontal=4.dp), style = typography.body2)
                 Text(project.date, style = typography.body2)
             }
-            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier
+                    .padding(top = 16.dp)
+                    .fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 AvatarList(
                     size = 44.dp,
                     users = project.users,
@@ -201,7 +206,7 @@ fun TimelineScreen(project: Project = mockProject) {
 
         Column(
             Modifier
-                .background(Color(0xFFF1F5FE), shape = RoundedCornerShape(topLeft = 40.dp))
+                .background(Color(0xFFF1F5FE), shape = RoundedCornerShape(topStart = 40.dp))
                 .padding(top = 40.dp)
                 .padding(horizontal = 20.dp)
                 .fillMaxWidth()
@@ -255,8 +260,7 @@ fun Modifier.circularProgress(
     Box(
         modifier
             .circularProgress(progress, color)
-            .size(48.dp),
-        gravity = ContentGravity.Center
+            .size(48.dp)
     ) {
         Text(text, color = color, fontWeight = FontWeight.Bold)
     }
@@ -297,8 +301,8 @@ private fun DrawScope.drawCircularIndicator(
 
 private fun Modifier.layoutOffset(x: Dp = 0.dp, y: Dp = 0.dp) = this then layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    layout(placeable.width + x.toIntPx(), placeable.height + y.toIntPx()) {
-        placeable.placeRelative(x.toIntPx(), y.toIntPx())
+    layout(placeable.width + x.roundToPx(), placeable.height + y.roundToPx()) {
+        placeable.placeRelative(x.roundToPx(), y.roundToPx())
     }
 }
 
@@ -336,7 +340,7 @@ private fun Modifier.layoutOffset(x: Dp = 0.dp, y: Dp = 0.dp) = this then layout
     modifier: Modifier = Modifier
 ) {
     Avatar(size, onClick, stack, modifier) {
-        Icon(Icons.Filled.Add)
+        Icon(Icons.Filled.Add, contentDescription = "Add")
     }
 }
 
@@ -353,13 +357,14 @@ fun Avatar(
         onClick = onClick,
         modifier = modifier
             .layoutOffset(if (!stack) 0.dp else overlap)
-            .drawShadow(5.dp, CircleShape, clip = false)
+            .shadow(5.dp, CircleShape, clip = false)
             .background(Color.White, CircleShape)
             .padding(2.dp)
             .size(size),
-        icon = content
+        content = content
     )
 }
+
 
 @Composable fun Avatar(
     size: Dp,
@@ -370,7 +375,8 @@ fun Avatar(
 ) {
     Avatar(size, onClick, stack, modifier) {
         CoilImage(
-            user.imageUrlForSize(with(DensityAmbient.current) { size.toIntPx() }),
+            user.imageUrlForSize(with(LocalDensity.current) { size.roundToPx() }),
+            contentDescription = null,
             modifier = Modifier
                 .clip(CircleShape)
                 .fillMaxSize()

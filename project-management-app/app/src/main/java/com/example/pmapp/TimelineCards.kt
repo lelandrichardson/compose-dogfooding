@@ -1,28 +1,29 @@
 package com.example.pmapp
 
-import android.graphics.DashPathEffect
-import androidx.compose.foundation.Icon
-import androidx.compose.foundation.Text
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Attachment
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.times
 
 val linePosition = 80.dp
 val timelineDotSize = 8.dp
-val dashPathEffect = DashPathEffect(floatArrayOf(20f, 10f), 0f)
+val dashPathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 10f), 0f)
 
 val DrawScope.topRight: Offset get() = Offset(size.width, 0f)
 val DrawScope.bottomRight: Offset get() = Offset(size.width, size.height)
@@ -44,14 +45,14 @@ fun Modifier.drawLine(
         start = topRight,
         end = centerPosition,
         strokeWidth = top.stroke.width,
-        pathEffect = top.stroke.pathEffect
+//        pathEffect = top.stroke.pathEffect
     )
     drawLine(
         color = bottom.color,
         start = centerPosition,
         end = bottomRight,
         strokeWidth = bottom.stroke.width,
-        pathEffect = bottom.stroke.pathEffect
+//        pathEffect = bottom.stroke.pathEffect
     )
     if (status != null) {
         drawCircle(
@@ -87,7 +88,7 @@ fun Modifier.drawLine(
             rightContent()
         }
     }) { (left, right), constraints ->
-        val leftWidth = linePosition.toIntPx()
+        val leftWidth = linePosition.roundToPx()
         val placedRight = right.measure(
             androidx.compose.ui.unit.Constraints(
                 minWidth = (constraints.minWidth - leftWidth).coerceAtLeast(0),
@@ -118,7 +119,7 @@ fun TimelineHeader() {
         }
     ) {
         Text("Tasks")
-        Text("Show in days")
+        Text("Show iawdawdn days")
     }
 }
 
@@ -141,6 +142,7 @@ fun TimelineTask(
             Modifier
                 .padding(vertical = 8.dp)
                 .background(Color.White, RoundedCornerShape(6.dp))
+                .background(Color.White, RoundedCornerShape(6.dp))
                 .padding(16.dp)
                 .fillMaxWidth()
         ) {
@@ -160,17 +162,19 @@ fun TimelineTask(
             Row {
                 IconButton(onClick = {}) {
                     Row {
-                        Icon(Icons.Default.ChatBubbleOutline)
+                        Icon(Icons.Default.ChatBubbleOutline, contentDescription = null)
                         Text("${task.commentCount}")
                     }
                 }
                 IconButton(onClick = {}) {
                     Row {
-                        Icon(Icons.Default.Attachment)
+                        Icon(Icons.Default.Attachment, contentDescription = null)
                         Text("${task.attachmentCount}")
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                Spacer(
+                    Modifier.weight(weight)
+                )
                 Text("N\u00B0 ${task.id}")
                 AvatarList(
                     32.dp,
@@ -181,3 +185,5 @@ fun TimelineTask(
         }
     }
 }
+
+const val weight: Float = 1f
