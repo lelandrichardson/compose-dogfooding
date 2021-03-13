@@ -13,6 +13,7 @@ import com.example.countdown.ui.theme.CountdownTheme
 import android.view.WindowManager
 import android.view.View
 import android.view.Window
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,8 +25,8 @@ class MainActivity : AppCompatActivity() {
     setContent {
       CountdownTheme {
         // A surface container using the 'background' color from the theme
-        Surface(color = MaterialTheme.colors.background) {
-          Text("Hello World", Modifier.padding(50.dp))
+        Surface(color = MaterialTheme.colors.background, modifier = Modifier.fillMaxSize()) {
+          Countdown()
         }
       }
     }
